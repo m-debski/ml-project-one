@@ -133,16 +133,16 @@ print(new_data)
 actual_values = new_data["income"]
 predicted_values = new_data["PREDICTED_INCOME"]
 
-ABOVE_true_positive = 
-ABOVE_true_negative = 
-ABOVE_false_positive = 
-ABOVE_false_negative =
+ABOVE_true_positive = ((actual_values == ">50K") & (predicted_values == ">50K")).sum()
+ABOVE_true_negative = ((actual_values == "<=50K") & (predicted_values == "<=50K")).sum()
+ABOVE_false_positive = ((actual_values == "<=50K") & (predicted_values == ">50K")).sum()
+ABOVE_false_negative = ((actual_values == ">50K") & (predicted_values == "<=50K")).sum()
 
 
-BELOW_true_positive =
-BELOW_true_negative = 
-BELOW_false_positive = 
-BELOW_false_negative = 
+BELOW_true_positive = ABOVE_true_negative
+BELOW_true_negative = ABOVE_true_positive
+BELOW_false_positive = ABOVE_false_negative
+BELOW_false_negative = ABOVE_false_positive
 
 
 true_positive = ABOVE_true_positive + BELOW_true_positive
@@ -161,3 +161,28 @@ recall_below = BELOW_true_positive / (BELOW_true_positive + BELOW_false_negative
 
 f1_above = 2*(precision_above*recall_above) / (precision_above+recall_above)
 f1_below = 2*(precision_below*recall_below) / (precision_below+recall_below)
+
+print(f"Accuracy: {accuracy}")
+print(f"Precision ABOVE: {precision_above}")
+print(f"Precision BELOW: {precision_below}")
+print(f"Recall ABOVE: {recall_above}")
+print(f"Recall BELOW: {recall_below}")
+print(f"F1 ABOVE: {f1_above}")
+print(f"F1 BELOW: {f1_below}")
+
+confusion_matrix = pd.DataFrame(
+    [[ABOVE_true_positive, ABOVE_false_negative],
+     [ABOVE_false_positive, ABOVE_true_negative]],
+    index=["Actual >50K", "Actual <=50K"],
+    columns=["Pred >50K", "Pred <=50K"]
+)
+
+print(confusion_matrix)
+
+#some categorical feature values in the test set may not have appeared during training, how many test instances contain at least one
+#unseen category value. Where any test instances skipped because they could not be classified?
+
+
+
+#provide examples of instances classified with high and low confidence. Measured using R = P(c1|x) / P(c2|x)
+#Higher R means the model is more confident the instance belongs to C1. R ~ 1 means its uncertain. provide various examples the thingy lists
