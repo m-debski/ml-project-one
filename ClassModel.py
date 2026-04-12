@@ -39,11 +39,11 @@ class ClassModel():
         return unique_values
 
     def compute_categorical_log_prob(self, value: str, feature_name: str, num_distinct_feature_values: int) -> float:
-        #get the count of this feature value, based on the features stats
         count = self._categorical_feature_stats[feature_name].get(value, 0)
-        return log( (count + LAPLACE) / self._train_partition_len + LAPLACE * num_distinct_feature_values)
+        denom = self._train_partition_len + LAPLACE * num_distinct_feature_values
+        return log(count + LAPLACE) - log(denom)
 
-    def compute_continuous_log_prob(self, value: str, feature_name: str) -> float:
+    def compute_continuous_log_prob(self, value: float, feature_name: str) -> float:
         mean = self._continuous_feature_stats[feature_name]["mean"]
         var = self._continuous_feature_stats[feature_name]["var"]
         if var == 0:

@@ -1,10 +1,12 @@
 from ClassModel import ClassModel
+import pandas as pd
 from pandas import DataFrame, Series
 from math import log, exp
 
-HAS_UNSEEN_SIGNIFIER = "_HAS_UNSEEN"
-CLASS_LABEL_SIGNIFIER = "_CLASS_LABEL"
-CONFIDENCE_SIGNIFIER = "_CONFIDENCE"
+# Columns added by test(); kept stable for evaluate() and assignment reporting helpers.
+COL_PREDICTED = "PREDICTED_INCOME"
+COL_HAS_UNSEEN = "HAS_UNSEEN"
+COL_CONFIDENCE = "CONFIDENCE"
 
 class BinaryNaiveBayesModel():
     def __init__(self, class_label_column: str, class_label_values: [], categorical_feature_names: [], continuous_feature_names: []) -> None:
@@ -34,23 +36,21 @@ class BinaryNaiveBayesModel():
         #Store the set of values seen for each categorical feature
         #TODO: there is definitely a more efficient way of doing this.....
         #TODO: is the term 'model' misleading here?
-        for class_label, model in self._class_models.items():
-            model_find =  model.get_unique_categorical_values(self._categorical_feature_names)
-
-            self._categorical_unique_values = {
-                key: self._categorical_unique_values.get(key, set()) |model_find.get(key, set())
-                for key in self._categorical_unique_values.keys() | model_find.keys()
-            }
+        #TODO: this is meant to be unique values for everyone right?
+        for feature in self._categorical_feature_names:
+            self._categorical_unique_values[feature] = set(
+                training_data[feature].dropna().unique().tolist()
+            )
 
 
     def test(self, testing_data: DataFrame) -> DataFrame:
         testing_data = testing_data.copy()
 
         #apply the predictive function to each instance
-        test_results = testing_data.apply(self._predict_instance, axis = 1)
-        testing_data["HAS_UNSEEN_SIGNIFIER"] = test_results.apply(lambda x: x["class_label"])
-        testing_data["CLASS_LABEL_SIGNIFIER"] = test_results.apply(lambda x: x["contains_unseen_values"])
-        testing_data[f"CONFIDENCE_SIGNIFIER"] = test_results.apply(lambda x: x["confidence"])
+        test_results = testing_data.apply(self._predict_instance, axis=1)
+        testing_data[COL_PREDICTED] = test_results.apply(lambda x: x["class_label"])
+        testing_data[COL_HAS_UNSEEN] = test_results.apply(lambda x: x["contains_unseen_values"])
+        testing_data[COL_CONFIDENCE] = test_results.apply(lambda x: x["confidence"])
 
         return testing_data
 
@@ -89,6 +89,60 @@ class BinaryNaiveBayesModel():
             "class_label": max(class_label_scores, key=class_label_scores.get),
             "contains_unseen_values": contains_unseen_values,
             "confidence": confidence,
+        }
+
+    def evaluate(self, test_results: DataFrame) -> {}:
+        actual = test_results[self._class_label_column]
+        predicted = test_results[COL_PREDICTED]
+
+        total_tp = 0
+        total_tn = 0
+        total_fp = 0
+        total_fn = 0 
+        per_class = {}
+
+        for class_label in self._class_label_values:
+            tp = int(((actual == class_label) & (predicted == class_label)).sum())
+            tn = int(((actual != class_label) & (predicted != class_label)).sum())
+            fp = int(((actual != class_label) & (predicted == class_label)).sum())
+            fn = int(((actual == class_label) & (predicted != class_label)).sum())
+
+            total_tp += tp
+            total_tn += tn
+            total_fp += fp
+            total_fn += fn
+
+            precision = 0.0
+            if(tp + fp):
+                precision = tp / (tp + fp)
+
+            recall = 0.0
+            if (tp + fn):
+                recall = tp / (tp + fn)
+
+            f1 = 0.0
+            if (precision + recall):
+                f1 = (2 * precision * recall / (precision + recall))
+
+            per_class[class_label] = {
+                "precision": precision,
+                "recall": recall,
+                "f1": f1,
+            }
+
+        accuracy = (total_tp + total_tn) / (total_tp + total_tn + total_fp + total_fn)
+
+        confusion_matrix = pd.crosstab(
+            actual,
+            predicted,
+            rownames=["Actual"],
+            colnames=["Predicted"],
+        )
+
+        return {
+            "accuracy": accuracy,
+            "confusion_matrix": confusion_matrix,
+            "per_class": per_class,
         }
 
     #METHODS REQUIRED JUST TO ANSWER QUESTIONS
@@ -135,4 +189,27 @@ class BinaryNaiveBayesModel():
             class_label_1: sorted(results, key=lambda x: x[2], reverse=True)[:num],
             class_label_2: sorted(results, key=lambda x: x[2])[:num]
         }
+
+    #TODO: surely a better way to do this...?
+    def get_unseen_indicator(self) -> str:
+        return COL_HAS_UNSEEN
+
+    def get_confidence_indicator(self) -> str:
+        return COL_CONFIDENCE
+
+    def get_prediction_indicator(self) -> str:
+        return COL_PREDICTED
+
+    def get_high_confidence_instances(self, test_results: DataFrame, count:int , classification: str) -> DataFrame:
+        #TODO: is this ad hoc?
+        classified = test_results[test_results[COL_PREDICTED] == classification]
+        if classification == self._class_label_values[0]:
+            classified = classified.sort_values(by=COL_CONFIDENCE, ascending=False)
+        elif classification == self._class_label_values[1]:
+            classified = classified.sort_values(by=COL_CONFIDENCE, ascending=True)
+        return classified.head(count)
+
+    def get_near_decision_boundary_instances(self,  test_results: DataFrame, count:int) -> DataFrame:
+        #TODO: explain this better
+        return test_results.iloc[(test_results[COL_CONFIDENCE] - 1).abs().argsort()].head(count)
 
