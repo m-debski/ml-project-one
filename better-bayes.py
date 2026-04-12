@@ -27,7 +27,6 @@ class NaiveBayesModel():
                 self.data_set[self.data_set[self.class_column] == value], 
                 len(self.data_set)
             )
-            print(f"created class state for: {state.label} with count {state.count} and prob {state.prob}")
             self.class_states.append(state)
 
 
@@ -56,12 +55,12 @@ class NaiveBayesModel():
         }
 
     def test(self, test_df):
-
         results = test_df.apply(self._predict_row, axis=1)
         test_df["PREDICTED_INCOME"] = results.apply(lambda x: x["prediction"])
         test_df["HAS_UNSEEN"] = results.apply(lambda x: x["had_unseen"])
         test_df[f"CONFIDENCE"] = results.apply(lambda x: x["confidence"])
 
+    def evaluate(self, test_df):
         actual_values = test_df["income"]
         predicted_values = test_df["PREDICTED_INCOME"]
 
@@ -106,6 +105,7 @@ class NaiveBayesModel():
 
         print(f"Confusion Matrix: {confusion_matrix}")
         print("\n")
+
 
 
     def _predict_row(self, row):
@@ -262,6 +262,7 @@ test_df = test_df.dropna()
 #currently all this stuff is just in model.test().... TODO: this should probably change, some class should like store it!
 
 model.test(test_df)
+model.evaluate(test_df)
 
 #2. Report how many test instances contain at least one unseen category value. How do we handle them. Were any test instances skipped entirely because they could not be classified?
 
@@ -293,3 +294,27 @@ print("Instances near decision boundary (R~1):")
 print("\n")
 print(df_3b)
 print("\n")
+
+"""
+
+QUESTION 3 OF THE ASSIGNMENT: LABEL PROPAGATION
+
+"""
+
+#1. assign predicted labels to the unlabelled dataset
+
+pseudo_df = pd.read_csv("data/stripped-adult_unlabelled.csv")
+pseudo_df = pseudo_df.dropna()
+model.test(pseudo_df)
+
+#2. treat these predictions as ground truth, then retrain your model on the combined supervised data and pseudo-labeled data
+
+pseudo_df = pseudo_df.rename(columns={"PREDICTED_INCOME": "income"})
+#TODO: this is pretty ad hoc, no? maybe we will change things around..
+pseudo_df = pseudo_df.drop(columns=["HAS_UNSEEN", "CONFIDENCE"])
+print(pseudo_df)
+
+combined_df = pd.concat([train_df, pseudo_df], axis=0, ignore_index=True)
+
+new_model= NaiveBayesModel(CLASS_COLUMN, CLASS_VALUES, CATEGORICAL_COLUMNS, CONTINUOUS_COLUMNS, combined_df)
+model.train()
