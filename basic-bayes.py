@@ -87,26 +87,34 @@ for feature_title in CATEGORICAL_FEATURE_TITLES:
     below_categorical_features[feature_title] = CategoricalFeature(feature_title, df_below)
 
 
-def predict_row(row):
-
+def score_row(row):
+    """Log unnormalized posterior terms: log P(c) + sum_j log P(x_j|c). Same additive constant for both."""
     above_score = math.log(p_above)
-
     for feature_title in CONTINUOUS_FEATURE_TITLES:
         above_score += above_continuous_features[feature_title].log_probability(row[feature_title])
-
     for feature_title in CATEGORICAL_FEATURE_TITLES:
         above_score += above_categorical_features[feature_title].log_probability(row[feature_title])
 
-
     below_score = math.log(p_below)
-
     for feature_title in CONTINUOUS_FEATURE_TITLES:
         below_score += below_continuous_features[feature_title].log_probability(row[feature_title])
-
     for feature_title in CATEGORICAL_FEATURE_TITLES:
         below_score += below_categorical_features[feature_title].log_probability(row[feature_title])
 
+    return above_score, below_score
 
+
+def posterior_ratio_R(row):
+    """
+    R = P(>50K | x) / P(<=50K | x).  The marginal P(x) cancels, so this equals exp(above_log - below_log).
+    R >> 1: confident >50K; R << 1: confident <=50K; R ~ 1: near the decision boundary.
+    """
+    a, b = score_row(row)
+    return math.exp(a - b)
+
+
+def predict_row(row):
+    above_score, below_score = score_row(row)
     if above_score > below_score:
         return ">50K"
     else:
@@ -182,7 +190,23 @@ print(confusion_matrix)
 #some categorical feature values in the test set may not have appeared during training, how many test instances contain at least one
 #unseen category value. Where any test instances skipped because they could not be classified?
 
+#TODO: need to implement a way to find this
 
 
-#provide examples of instances classified with high and low confidence. Measured using R = P(c1|x) / P(c2|x)
-#Higher R means the model is more confident the instance belongs to C1. R ~ 1 means its uncertain. provide various examples the thingy lists
+
+#provide examples of instances classified with high and low confidence. Measured using R = P(c1|
+#x) / P(c2|x)
+#Higher R means the model is more confident the instance belongs to C1. R ~ 1 means its 
+#uncertain. provide various examples the thingy lists
+
+#TODO: need to implement this
+
+
+"""
+
+now we need to extend the model for part 3 using option 1 label propgation
+
+- use q1 model to assign predicted labels ot the unlabeeled dataset. these are a ground truth
+- retrain the model on the combined supervises data and pseudo-labeled data.
+
+"""
