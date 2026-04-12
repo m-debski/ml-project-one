@@ -46,25 +46,29 @@ for class_label, proability in prior_probabilities.items():
 print("\n")
 
 #2.
-continuous_feature_stats = model.get_continuous_feature_stats()
 print("Continuous Feature Stats:")
-for class_label, feature_stats in continuous_feature_stats.items():
-    print(f"    Stats for {class_label}:")
-    for feature, stats in feature_stats.items():
-        print(f"        Feature: {feature}")
-        print(f"            mean:{feature_stats[feature]["mean"]}")
-        print(f"            variance:{feature_stats[feature]["var"]}")
-    print("\n")
+def print_continuous_feature_stats(model: BinaryNaiveBayesModel):
+    continuous_feature_stats = model.get_continuous_feature_stats()
+    for class_label, feature_stats in continuous_feature_stats.items():
+        print(f"    Stats for {class_label}:")
+        for feature, stats in feature_stats.items():
+            print(f"        Feature: {feature}")
+            print(f"            mean:{feature_stats[feature]["mean"]}")
+            print(f"            variance:{feature_stats[feature]["var"]}")
+        print("\n")
+print_continuous_feature_stats(model)
 
 #3.
-#TODO: am i meant to flip these for >50k or something????
-top_predictive_categories = model.get_top_predictive_categories(num=3)
 print("Top Predictive Features:")
-for class_label, predictive_stats in top_predictive_categories.items():
-    print(f"    Features for {class_label}:")
-    for feature, value, confidence in predictive_stats:
-        print(f"        Value: {value} for Feature: {feature} with Confidence: {confidence}")
-    print("\n")
+def print_top_predictive_features(model: BinaryNaiveBayesModel) -> None:
+    #TODO: am i meant to flip these for >50k or something????
+    top_predictive_categories = model.get_top_predictive_categories(num=3)
+    for class_label, predictive_stats in top_predictive_categories.items():
+        print(f"    Features for {class_label}:")
+        for feature, value, confidence in predictive_stats:
+            print(f"        Value: {value} for Feature: {feature} with Confidence: {confidence}")
+        print("\n")
+print_top_predictive_features(model)
 
 """
 Question 2:
@@ -82,17 +86,19 @@ test_results = model.test(test_df)
 
 #1.
 print("Model Evaluation:")
-evaluation_stats = model.evaluate(test_results)
-print(f"    Accuracy:{evaluation_stats["accuracy"]} \n")
-for class_label, metrics in evaluation_stats["per_class"].items():
-    print(f"    Stats For {class_label}:")
-    print(f"        Precision: {metrics["precision"]}")
-    print(f"        Recall: {metrics["recall"]}")
-    print(f"        F1 Score: {metrics["f1"]}")
+def print_evaluate_model(model: BinaryNaiveBayesModel, results_df: pd.DataFrame):
+    evaluation_stats = model.evaluate(results_df)
+    print(f"    Accuracy:{evaluation_stats["accuracy"]} \n")
+    for class_label, metrics in evaluation_stats["per_class"].items():
+        print(f"    Stats For {class_label}:")
+        print(f"        Precision: {metrics["precision"]}")
+        print(f"        Recall: {metrics["recall"]}")
+        print(f"        F1 Score: {metrics["f1"]}")
 
-print(f"\n Confusion Matrix:\n")
-print(evaluation_stats["confusion_matrix"])
-print("\n")
+    print(f"\n Confusion Matrix:\n")
+    print(evaluation_stats["confusion_matrix"])
+    print("\n")
+print_evaluate_model(model, test_results)
 
 #2. 
 unseen_indicator = model.get_unseen_indicator()
@@ -147,8 +153,67 @@ new_model = BinaryNaiveBayesModel(
     continuous_feature_names=CONTINUOUS_FEATURE_NAMES,
 )
 combined_df = pd.concat([training_df, model_labeled_df], axis=0, ignore_index=True)
-model.train(combined_df)
+new_model.train(combined_df)
 
 #3. 
 #TODO: need to do all this, it looks like quite a lot of permutations of models, but also a lot of like needing to find certain stats and stuff to evaluate with, hopefully its not too bad....
 
+
+"""
+Question 4:
+1. Compare evaluation stats from Q1 and Q3 models
+2. Compare the distribution of confidence between the models
+3. Compare the estimated means/variances of continuous features and category probabilities of categorical features
+4. Have the top predictors for each class changed? 
+"""
+
+#1.
+new_test_results = new_model.test(test_df)
+print("Q1 Model Evaluation:")
+print_evaluate_model(model, test_results)
+print("Q3 Model Evaluation:")
+print_evaluate_model(new_model, new_test_results)
+
+#2.
+
+def print_confidence_distribution_data(results_df: pd.DataFrame, model: BinaryNaiveBayesModel) -> None:
+    #TODO: actually do something with this
+    confidence_column = model.get_confidence_indicator()
+    confidence = results_df[confidence_column]
+
+print("Confidence Distribution for Q1 Model:")
+print_confidence_distribution_data(test_results, model)
+print("Confidence Distribution for 3 Model:")
+print_confidence_distribution_data(new_test_results, new_model)
+
+#3.
+print("Continuous Feature Stats Q1:")
+print_continuous_feature_stats(model)
+
+
+def print_categorical_feature_stats(model: BinaryNaiveBayesModel):
+    categorical_feature_stats = model.get_categorical_feature_stats()
+    for class_label, feature_stats in categorical_feature_stats.items():
+        print(f"    Stats for {class_label}:")
+        for feature, stats in feature_stats.items():
+            print(f"        Feature: {feature}")
+            for value, count in stats.items():
+                print(f"            Value: {value} count: {count}")
+        print("\n")
+    
+
+print("Categorical Feature Stats Q1:")
+print_categorical_feature_stats(model)
+
+print("Continuous Feature Stats Q3:")
+print_continuous_feature_stats(new_model)
+
+print("Categorical Feature Stats Q3:")
+print_categorical_feature_stats(new_model)
+
+
+#4.
+print("Top Predictive Features for Model Q1")
+print_top_predictive_features(model)
+print("Top Predictive Features for Model Q3")
+print_top_predictive_features(new_model)

@@ -160,6 +160,12 @@ class BinaryNaiveBayesModel():
             stats[class_label] = model.get_continuos_feature_stats()
         return stats
 
+    def get_categorical_feature_stats(self) -> {}:
+        stats = {}
+        for class_label, model in self._class_models.items():
+            stats[class_label] = model.get_categorical_feature_stats()
+        return stats
+
 
     def get_top_predictive_categories(self, num: int) -> dict:
         #TODO: comment this better
