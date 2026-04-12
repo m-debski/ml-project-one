@@ -5,6 +5,9 @@ import math
 LAPLACE = 1
 EPSILON = 1e-9
 
+#this is used to treat ? as missing 
+CSV_READ_KWARGS = {"na_values": ["?"]}
+
 class NaiveBayesModel():
     def __init__(self, class_column, class_values, categorical_columns, continuous_columns, data_set):
         self.data_set = data_set
@@ -46,8 +49,10 @@ class NaiveBayesModel():
                     "variance": np.var(data_set[column].tolist()),
                 }
 
+        # K_j = number of distinct values of feature j in training data (spec formula).
+        #TODO: is this correct?
         self.k_per_feature = {
-            col: int(self.data_set[col].nunique()) + 1 for col in self.categorical_columns
+            col: max(1, int(self.data_set[col].nunique())) for col in self.categorical_columns
         }
 
         self.seen_categories = {
@@ -112,7 +117,6 @@ class NaiveBayesModel():
 
         state_scores = {}
         unseen = self._get_unseen_categories_in_row(row)
-        print(unseen)
 
         for state in self.class_states:
             score = math.log(state.prob)
@@ -170,7 +174,8 @@ class NaiveBayesModel():
     #METHODS FOR QUESTION 2:
 
     def get_unseen_count(self, test_df):
-        print(f"Number of instances with at least one unseen category value: {len(test_df["HAS_UNSEEN"] == True)}")
+        n = int(test_df["HAS_UNSEEN"].sum())
+        print(f"Number of instances with at least one unseen category value: {n}")
         print("\n")
 
     def get_high_confidence_instances(self, test_df, count, classification):
@@ -186,6 +191,34 @@ class NaiveBayesModel():
         return test_df.iloc[(test_df["CONFIDENCE"] - 1).abs().argsort()].head(count)
 
 
+    def get_top_predictive_categories(self, top_n=5):
+        state1 = self.class_states[0]  # <=50K
+        state2 = self.class_states[1]  # >50K
+
+        results = []
+        #for each categorical variable
+        for col in self.categorical_columns:
+            k = self.k_per_feature[col]
+            #combine all the values for each class
+            all_values = set(state1.categorical_counts[col].keys()) | set(state2.categorical_counts[col].keys())
+            for val in all_values:
+                #apply la place smoothing
+                count1 = state1.categorical_counts[col].get(val, 0)
+                count2 = state2.categorical_counts[col].get(val, 0)
+                p1 = (count1 + 1) / (state1.count + k)
+                p2 = (count2 + 1) / (state2.count + k)
+                R = p2 / p1 
+                results.append((col, val, R))
+
+        most_predictive_high = sorted(results, key=lambda x: x[2], reverse=True)[:top_n]
+        most_predictive_low = sorted(results, key=lambda x: x[2])[:top_n]
+        print("Top predictors for >50K:")
+        for predictor in most_predictive_high:
+            print(predictor)
+
+        print("\nTop predictors for <=50K:")
+        for predictor in most_predictive_low:
+            print(predictor)
 
 class ClassState():
     def __init__(self, label: str, data_set, total_count):
@@ -213,15 +246,25 @@ class ClassState():
         return -0.5 * math.log(2 * math.pi * var) - ((x - mu) ** 2) / (2 * var)
 
 
+
+USING_SMALLER_FILES = False
+
+SUPERVISED_TRAIN = "data/adult_supervised_train.csv"
+TEST = "data/adult_test.csv"
+UNLABELED = "data/adult_unlabelled.csv"
+if(USING_SMALLER_FILES):
+    SUPERVISED_TRAIN = "data/stripped-adult_supervised_train.csv"
+    TEST = "data/stripped-adult_test.csv"
+    UNLABELED = "data/stripped-adult_unlabelled.csv"
+
 CLASS_COLUMN = "income"
 CLASS_VALUES = ["<=50K", ">50K"]
 CATEGORICAL_COLUMNS = ["workclass","education","marital-status","occupation","relationship","race","sex",
 "native-country"]
 CONTINUOUS_COLUMNS = ["age","education-num","capital-gain","capital-loss","hours-per-week"]
 
-# 1. read in data and clean empty rows
-train_df = pd.read_csv("data/stripped-adult_supervised_train.csv")
-#TODO: need to change drop method i think, and how do we do this throughout?
+# 1. read in data and clean empty rows (use SUPERVISED_TRAIN; toggle USING_SMALLER_FILES for quick runs)
+train_df = pd.read_csv(SUPERVISED_TRAIN, **CSV_READ_KWARGS)
 train_df = train_df.dropna()
 
 
@@ -245,7 +288,7 @@ model.print_continuous_estimates()
 
 #3. for each categorical feature, identify the category value most strongle predicitve of each class. One way to measure this is the probability ratio R = P(xj = v | c1) / P(xj = v | c2). List the five most predictive category values for each class (across all categorical features) and their R values
 
-#TODO: do this, seems a little tedious?
+model.get_top_predictive_categories()
 
 
 """
@@ -254,7 +297,7 @@ QUESTION 2 OF THE ASSIGNMENT:
 
 """
 
-test_df = pd.read_csv("data/stripped-adult_test.csv")
+test_df = pd.read_csv(TEST, **CSV_READ_KWARGS)
 test_df = test_df.dropna()
 
 
@@ -303,7 +346,7 @@ QUESTION 3 OF THE ASSIGNMENT: LABEL PROPAGATION
 
 #1. assign predicted labels to the unlabelled dataset
 
-pseudo_df = pd.read_csv("data/stripped-adult_unlabelled.csv")
+pseudo_df = pd.read_csv(UNLABELED, **CSV_READ_KWARGS)
 pseudo_df = pseudo_df.dropna()
 model.test(pseudo_df)
 
@@ -317,4 +360,54 @@ print(pseudo_df)
 combined_df = pd.concat([train_df, pseudo_df], axis=0, ignore_index=True)
 
 new_model= NaiveBayesModel(CLASS_COLUMN, CLASS_VALUES, CATEGORICAL_COLUMNS, CONTINUOUS_COLUMNS, combined_df)
-model.train()
+new_model.train()
+
+
+"""
+
+QUESTION 4 OF THE ASSIGNMENT
+
+
+"""
+
+#1. Report evaluation stats to compare
+
+confidences_q1_on_test = test_df["CONFIDENCE"].copy()
+
+new_model.test(test_df)
+new_model.evaluate(test_df)
+
+confidences_q3_on_test = test_df["CONFIDENCE"].copy()
+
+
+#2. How has the model changed? Investigate changes in 
+#a. model confidence. Has the distribution of R values shifted?
+#TODO: how would i present this data well?
+
+previous_confidences = confidences_q1_on_test
+new_confidences = confidences_q3_on_test
+
+#b. Feature parameters... values in continuous and categorical variables
+#TODO: how would i present this data well? / evaluate it?
+
+print("Q1 model values:")
+for state in model.class_states:
+    print(f"  Class: {state.label}:")
+    print(state.categorical_counts)
+    print("\n")
+    print(state.continuous_stats)
+    print("\n")
+
+print("\n")
+print("Q3 model values:")
+for state in new_model.class_states:
+    print(f"  Class: {state.label}:")
+    print(state.categorical_counts)
+    print("\n")
+    print(state.continuous_stats)
+    print("\n")
+
+
+#c. Most predictive features. have the top predictors for each class change
+
+new_model.get_top_predictive_categories()
