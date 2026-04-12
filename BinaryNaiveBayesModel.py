@@ -9,10 +9,10 @@ CONFIDENCE_SIGNIFIER = "_CONFIDENCE"
 class BinaryNaiveBayesModel():
     def __init__(self, class_label_column: str, class_label_values: [], categorical_feature_names: [], continuous_feature_names: []) -> None:
         self._class_label_column = class_label_column
-        self._class_label_values = tuple(class_label_values)
         self._categorical_feature_names = categorical_feature_names
         self._continuous_feature_names = continuous_feature_names
 
+        self._class_label_values = tuple(class_label_values)
         self._class_models = {class_label: ClassModel() for class_label in class_label_values}
 
         self._categorical_unique_values = {feature: set() for feature in categorical_feature_names}
@@ -90,3 +90,49 @@ class BinaryNaiveBayesModel():
             "contains_unseen_values": contains_unseen_values,
             "confidence": confidence,
         }
+
+    #METHODS REQUIRED JUST TO ANSWER QUESTIONS
+
+    def get_prior_probabilities(self) -> {}:
+        priors = {}
+        for class_label, model in self._class_models.items():
+            priors[class_label] = model.get_prior_probability()
+        return priors
+            
+
+    def get_continuous_feature_stats(self) -> {}:
+        stats = {}
+        for class_label, model in self._class_models.items():
+            stats[class_label] = model.get_continuos_feature_stats()
+        return stats
+
+
+    def get_top_predictive_categories(self, num: int) -> dict:
+        #TODO: comment this better
+        class_label_1 = self._class_label_values[0]
+        class_label_2 = self._class_label_values[1]
+        model_1 = self._class_models[class_label_1]
+        model_2 = self._class_models[class_label_2]
+
+        results = []
+        for feature in self._categorical_feature_names:
+
+            num_unique_values = len(self._categorical_unique_values[feature])
+            all_values = set(model_1.get_categorical_feature_stats()[feature].keys()) | set(
+                model_2.get_categorical_feature_stats()[feature].keys()
+            )
+
+            for value in all_values:
+                #apply la place smoothing
+                count1 = model_1.get_categorical_feature_stats()[feature].get(value, 0)
+                count2 = model_2.get_categorical_feature_stats()[feature].get(value, 0)
+                p1 = (count1 + 1) / (model_1.get_train_partition_len() + num_unique_values)
+                p2 = (count2 + 1) / (model_2.get_train_partition_len() + num_unique_values)
+                r_value = p2 / p1 
+                results.append((feature, value, r_value))
+
+        return {
+            class_label_1: sorted(results, key=lambda x: x[2], reverse=True)[:num],
+            class_label_2: sorted(results, key=lambda x: x[2])[:num]
+        }
+

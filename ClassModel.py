@@ -38,9 +38,6 @@ class ClassModel():
             unique_values[feature] = feature_unique_values
         return unique_values
 
-    def get_prior_probability(self) -> float:
-        return self._prior_probability
-
     def compute_categorical_log_prob(self, value: str, feature_name: str, num_distinct_feature_values: int) -> float:
         #get the count of this feature value, based on the features stats
         count = self._categorical_feature_stats[feature_name].get(value, 0)
@@ -52,5 +49,18 @@ class ClassModel():
         if var == 0:
             var = EPSILON
         return -0.5 * log(2 * pi * var) - ((value - mean) ** 2) / (2 * var)
+
+    def get_prior_probability(self) -> float:
+        return self._prior_probability
+
+    def get_train_partition_len(self) -> int:
+        return self._train_partition_len
+
+    #METHODS JUST FOR ANSWERING QUESTIONS
+
+    def get_continuos_feature_stats(self) -> {}:
+        return self._continuous_feature_stats
     
+    def get_categorical_feature_stats(self) -> {}:
+        return self._categorical_feature_stats
 
