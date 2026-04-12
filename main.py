@@ -1,7 +1,8 @@
+from re import S
 from BinaryNaiveBayesModel import BinaryNaiveBayesModel
 import pandas as pd
 
-USING_SMALLER_FILES = False
+USING_SMALLER_FILES = True
 FILE_SUPERVISED_TRAIN = "data/adult_supervised_train.csv"
 FILE_TEST = "data/adult_test.csv"
 FILE_UNLABELED = "data/adult_unlabelled.csv"
@@ -30,4 +31,10 @@ training_df = pd.read_csv(FILE_SUPERVISED_TRAIN, **CSV_READ_KWARGS)
 training_df = training_df.dropna()
 
 model.train(training_df)
+
+test_df = pd.read_csv(FILE_TEST, **CSV_READ_KWARGS)
+test_df = test_df.dropna()
+test_results = model.test(test_df)
+
+print(test_results)
 

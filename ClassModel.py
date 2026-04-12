@@ -1,10 +1,14 @@
 from pandas import DataFrame
 import numpy as np
+from math import log, pi
+
+LAPLACE = 1
+#TODO: is this valid EPSILON????
+EPSILON = 1e-9
 
 class ClassModel():
     def __init__(self):
-        #TODO: is this a good way to init blank stuff for now?
-        self._train_data_partition = DataFrame()
+        self._train_data_partition = None
         self._train_partition_len = 0
         self._prior_probability = 0
         self._continuous_feature_stats = {}
@@ -34,5 +38,19 @@ class ClassModel():
             unique_values[feature] = feature_unique_values
         return unique_values
 
+    def get_prior_probability(self) -> float:
+        return self._prior_probability
+
+    def compute_categorical_log_prob(self, value: str, feature_name: str, num_distinct_feature_values: int) -> float:
+        #get the count of this feature value, based on the features stats
+        count = self._categorical_feature_stats[feature_name].get(value, 0)
+        return log( (count + LAPLACE) / self._train_partition_len + LAPLACE * num_distinct_feature_values)
+
+    def compute_continuous_log_prob(self, value: str, feature_name: str) -> float:
+        mean = self._continuous_feature_stats[feature_name]["mean"]
+        var = self._continuous_feature_stats[feature_name]["var"]
+        if var == 0:
+            var = EPSILON
+        return -0.5 * log(2 * pi * var) - ((value - mean) ** 2) / (2 * var)
     
 
